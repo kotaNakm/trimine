@@ -8,7 +8,6 @@ from tqdm import trange
 
 # https://github.com/scikit-learn/scikit-learn/blob/7e85a6d1f/sklearn/decomposition/_online_lda.py#L135
 
-
 class TriMine(object):
     def __init__(self, k, u, v, n, outputdir):
         # statuses
@@ -124,9 +123,7 @@ class TriMine(object):
         X: event tensor
         Z: topic assignments of the previous iteration
         """
-
         self.Nu = X.sum(axis=(1, 2))
-
 
         for t in trange(self.n, desc='#### Infering Z'):
             for i in range(self.u):
