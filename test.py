@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     # Infer TriMine's parameters
     start_time = time.process_time()
-    trimine.infer(tensor, n_iter=100)
+    trimine.infer(tensor, n_iter=10)
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time: {elapsed_time:.2f} [sec]')
 

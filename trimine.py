@@ -118,67 +118,8 @@ class TriMine(object):
 
         return llh
 
-    @numba.jit(nopython=True)
     def sample_topic(self, X, Z):
-        self.Nk,self.Nku,self.Nkv,self.Nku= _sample_topic()
-        ###↑ここnumba化する
-        """
-        X: event tensor
-        Z: topic assignments of the previous iteration
-        """
-        self.Nu = X.sum(axis=(1, 2))
-
-        # for t in trange(self.n, desc='#### Infering Z'):
-        for t in range(self.n):
-            for i in range(self.u):
-                for j in range(self.v):
-                    # for each non-zero event entry,
-                    # assign latent topic, z
-                    topic, count = Z[i, j, t], X[i, j, t]
-
-                    if count == 0:
-                        continue
-
-                    if not topic == -1:
-                        self.Nk[topic] -= count
-                        self.Nku[topic, i] -= count
-                        self.Nkv[topic, j] -= count
-                        self.Nkn[topic, t] -= count
-
-                    #     if ((self.Nk  < 0).sum() > 0 or
-                    #         (self.Nkv < 0).sum() > 0 or
-                    #         (self.Nku < 0).sum() > 0 or
-                    #         (self.Nkn < 0).sum() > 0):
-                    #         print("Invalid counter N has been found")
-                    #         # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
-                    #         exit()
-
-                    """ compute posterior distribution """
-                    posts = np.zeros(self.k)
-                    # print(self.Nku[:, i])
-                    # print(self.Nkv[:, j])
-                    # print(self.Nkn[:, t])
-
-                    for r in range(self.k):
-                        # NOTE: Nk[r] = Nkv[r, :].sum() = Nkn[r, :].sum()
-                        O = A = C = 1
-                        O = (self.Nku[r, i] + self.alpha) / (self.Nu[i] + self.alpha * self.k)
-                        A = (self.Nkv[r, j] + self.beta)  / (self.Nk[r] + self.beta  * self.v)
-                        C = (self.Nkn[r, t] + self.gamma) / (self.Nk[r] + self.gamma * self.n)
-                        posts[r] = O * A * C
-
-                    posts = posts / posts.sum()  # normalize
-                    topic = np.argmax(np.random.multinomial(1, posts))
-                    # print(topic, '<-', posts)
-
-                    Z[i, j, t] = topic
-                    self.Nk[topic] += count
-                    self.Nku[topic, i] += count
-                    self.Nkv[topic, j] += count
-                    self.Nkn[topic, t] += count
-
-        return Z
-
+        return _sample_topic(self.Nk,self.Nu,self.Nku,self.Nkv,self.Nkn,self.k,self.u,self.v,self.n,self.alpha,self.beta,self.gamma,X,Z)
 
     def update_alpha(self):
         # https://www.techscore.com/blog/2015/06/16/dmm/
@@ -274,3 +215,55 @@ class TriMine(object):
         np.savetxt(self.outputdir + 'A.txt', self.A)
         np.savetxt(self.outputdir + 'C.txt', self.C)
         np.savetxt(self.outputdir + 'train_log.txt', self.train_log)
+
+
+@numba.jit #(nopython=True)
+def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z):
+    """
+    X: event tensor
+    Z: topic assignments of the previous iteration
+    """
+    Nu = X.sum(axis=(1, 2))
+    # for t in trange(self.n, desc='#### Infering Z'):
+    for t in range(n):
+        for i in range(u):
+            for j in range(v):
+                # for each non-zero event entry,
+                # assign latent topic, z
+                topic, count = Z[i, j, t], X[i, j, t]
+                if count == 0:
+                    continue
+                if not topic == -1:
+                    Nk[topic] -= count
+                    Nku[topic, i] -= count
+                    Nkv[topic, j] -= count
+                    Nkn[topic, t] -= count
+                #     if ((self.Nk  < 0).sum() > 0 or
+                #         (self.Nkv < 0).sum() > 0 or
+                #         (self.Nku < 0).sum() > 0 or
+                #         (self.Nkn < 0).sum() > 0):
+                #         print("Invalid counter N has been found")
+                #         # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
+                #         exit()
+                """ compute posterior distribution """
+                posts = np.zeros(k)
+                # print(self.Nku[:, i])
+                # print(self.Nkv[:, j])
+                # print(self.Nkn[:, t])
+                for r in range(k):
+                    # NOTE: Nk[r] = Nkv[r, :].sum() = Nkn[r, :].sum()
+                    O = A = C = 1
+                    O = (Nku[r, i] + alpha) / (Nu[i] + alpha * k)
+                    A = (Nkv[r, j] + beta) / (Nk[r] + beta  * v)
+                    C = (Nkn[r, t] + gamma) / (Nk[r] + gamma * n)
+                    # print(O.shape,A.shape,C.shape)
+                    posts[r] = O * A * C
+                posts = posts / posts.sum()  # normalize
+                topic = np.argmax(np.random.multinomial(1, posts))
+                # print(topic, '<-', posts)
+                Z[i, j, t] = topic
+                Nk[topic] += count
+                Nku[topic, i] += count
+                Nkv[topic, j] += count
+                Nkn[topic, t] += count
+    return Z
