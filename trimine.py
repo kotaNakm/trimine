@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import digamma, loggamma
 from tqdm import trange
+import numba
 
 # https://github.com/scikit-learn/scikit-learn/blob/7e85a6d1f/sklearn/decomposition/_online_lda.py#L135
 
@@ -117,15 +118,18 @@ class TriMine(object):
 
         return llh
 
-
+    @numba.jit(nopython=True)
     def sample_topic(self, X, Z):
+        self.Nk,self.Nku,self.Nkv,self.Nku= _sample_topic()
+        ###↑ここnumba化する
         """
         X: event tensor
         Z: topic assignments of the previous iteration
         """
         self.Nu = X.sum(axis=(1, 2))
 
-        for t in trange(self.n, desc='#### Infering Z'):
+        # for t in trange(self.n, desc='#### Infering Z'):
+        for t in range(self.n):
             for i in range(self.u):
                 for j in range(self.v):
                     # for each non-zero event entry,
@@ -141,12 +145,13 @@ class TriMine(object):
                         self.Nkv[topic, j] -= count
                         self.Nkn[topic, t] -= count
 
-                        if ((self.Nk  < 0).sum() > 0 or
-                            (self.Nkv < 0).sum() > 0 or
-                            (self.Nku < 0).sum() > 0 or
-                            (self.Nkn < 0).sum() > 0):
-                            print("Invalid counter N has been found")
-                            exit()
+                    #     if ((self.Nk  < 0).sum() > 0 or
+                    #         (self.Nkv < 0).sum() > 0 or
+                    #         (self.Nku < 0).sum() > 0 or
+                    #         (self.Nkn < 0).sum() > 0):
+                    #         print("Invalid counter N has been found")
+                    #         # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
+                    #         exit()
 
                     """ compute posterior distribution """
                     posts = np.zeros(self.k)
