@@ -38,14 +38,18 @@ class TriMine(object):
         self.C = np.zeros((self.k, self.n))  # Time matrix
 
 
-    def init_status(self):
+    def init_status(self,tensor):
         self.Nk = np.zeros(self.k, dtype=int)
         self.Nu = np.zeros(self.u, dtype=int)
         self.Nku = np.zeros((self.k, self.u), dtype=int)
         self.Nkv = np.zeros((self.k, self.v), dtype=int)
         self.Nkn = np.zeros((self.k, self.n), dtype=int)
         self.Z = np.full((self.u, self.v, self.n), -1)
-        
+
+        # Nsum = tensor.sum()
+        # print(Nsum)
+        # self.Z = np.full((Nsum), -1)
+        # exit()
 
     def update_status(self,pre_n):
         tmp_Nkn = self.Nkn
@@ -70,7 +74,7 @@ class TriMine(object):
         Find: matrices, O, A, C
         """
         if init == True:
-            self.init_status()
+            self.init_status(tensor)
 
         for iteration in range(n_iter):
             # Sampling hidden topics z, i.e., Equation (1)
@@ -80,6 +84,7 @@ class TriMine(object):
             self.update_alpha()
             self.update_beta()
             self.update_gamma()
+            self.compute_factors()
 
             # Compute log-likelihood
             llh = self.loglikelihood()
@@ -104,7 +109,6 @@ class TriMine(object):
                 plt.savefig(self.outputdir + 'train_log.png')
                 plt.close()
         
-        self.compute_factors()
 
     def infer_online(self, tensor, n_iter=10, tol=1.e-8,verbose=True):
         """
@@ -281,7 +285,8 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z):
     X: event tensor
     Z: topic assignments of the previous iteration
     """
-    Nu = X.sum(axis=(1, 2))#怪しい
+
+    Nu = X.sum(axis=(1, 2))
     # for t in trange(self.n, desc='#### Infering Z'):
     for t in range(n):
         for i in range(u):

@@ -13,9 +13,9 @@ from trimine import TriMine
 
 if __name__ == '__main__':
 
-    input_tag = 'us_ele' #
+    # input_tag = 'us_ele' #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
-    # input_tag = 'online_retail_a2' #(36, 4631, 17713)
+    input_tag = 'online_retail_a2' #(36, 4631, 17713)
 
 
     tensor = np.load(f'../{input_tag}.npy')
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     sns.set()
 
     u, v, n = tensor.shape
-    k = 2
+    k = 5
     trimine = TriMine(k, u, v, n, outputdir)
 
     # Infer TriMine's parameters
