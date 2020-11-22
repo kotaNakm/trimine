@@ -18,7 +18,7 @@ class TriMine(object):
         self.n = n  # data duration
         self.outputdir = outputdir
         self.train_log = []
-        self.max_alpha = 0.001
+        self.max_alpha = 0.01
         self.max_beta  = 10
         self.max_gamma = 10
         self.init_params()
@@ -29,9 +29,9 @@ class TriMine(object):
 
         # if parameter > 1: pure
         # if parameter < 1: mixed
-        self.alpha = 0.0001  #self.u
-        self.beta  = 10  #self.v
-        self.gamma = 10  #self.n
+        self.alpha = 0.0005/self.k  #self.u
+        self.beta  = 5  #self.v
+        self.gamma = 5 #self.n
 
         self.O = np.zeros((self.k, self.u))  # Object matrix
         self.A = np.zeros((self.k, self.v))  # Actor matrix
@@ -45,7 +45,15 @@ class TriMine(object):
         self.Nkv = np.zeros((self.k, self.v), dtype=int)
         self.Nkn = np.zeros((self.k, self.n), dtype=int)
         self.Z = np.full((self.u, self.v, self.n), -1)
+        
 
+    def update_status(self,pre_n):
+        tmp_Nkn = self.Nkn
+        tmp_Z = self.Z
+        self.Nkn = np.zeros((self.k, self.n), dtype=int)
+        self.Z = np.full((self.u, self.v, self.n), -1)
+        self.Nkn[:,:pre_n] = tmp_Nkn
+        self.Z[:,:,:pre_n] = tmp_Z
 
     def get_params(self, **kwargs):
         return self.alpha, self.beta, self.gamma
@@ -67,6 +75,54 @@ class TriMine(object):
         for iteration in range(n_iter):
             # Sampling hidden topics z, i.e., Equation (1)
             self.Z = self.sample_topic(tensor, self.Z)
+
+            # Update parameters
+            self.update_alpha()
+            self.update_beta()
+            self.update_gamma()
+
+            # Compute log-likelihood
+            llh = self.loglikelihood()
+            self.train_log.append(llh)
+
+            # Early break
+            if iteration > 0:
+                if np.abs(self.train_log[-1] - self.train_log[-2]) < tol:
+                    print('Early stopping')
+                    break
+            if verbose == True:
+                # Print learning log
+                print('Iteration', iteration + 1)
+                print('loglikelihood=\t', llh)
+                print(f'| alpha\t| {self.alpha:.3f}')
+                print(f'| beta \t| {self.beta:.3f} ')
+                print(f'| gamma\t| {self.gamma:.3f}')
+                # Save learning log
+                plt.plot(self.train_log)
+                plt.xlabel('Iterations')
+                plt.ylabel('Log-likelihood')
+                plt.savefig(self.outputdir + 'train_log.png')
+                plt.close()
+        
+        self.compute_factors()
+
+    def infer_online(self, tensor, n_iter=10, tol=1.e-8,verbose=True):
+        """
+        Given: a tensor (actors * objects * time)
+        Find: matrices, O, A, C
+        """
+        if not tensor.ndim == 3 :
+            tensor = tensor[:,:,np.newaxis] 
+
+        u,v,n = tensor.shape
+        pre_n = self.n
+        self.n += n
+
+        self.update_status(pre_n)
+
+        for iteration in range(n_iter):
+            # Sampling hidden topics z, i.e., Equation (1)
+            self.Z = self.online_sample_topic(tensor, self.Z, pre_n)
 
             # Update parameters
             self.update_alpha()
@@ -98,7 +154,6 @@ class TriMine(object):
                 plt.savefig(self.outputdir + 'train_log.png')
                 plt.close()
 
-
     def loglikelihood(self):
         """ Compute Log-likelihood """
 
@@ -120,6 +175,9 @@ class TriMine(object):
 
     def sample_topic(self, X, Z):
         return _sample_topic(self.Nk,self.Nu,self.Nku,self.Nkv,self.Nkn,self.k,self.u,self.v,self.n,self.alpha,self.beta,self.gamma,X,Z)
+
+    def online_sample_topic(self, X, Z,pre_n):
+        return _online_sample_topic(self.Nk,self.Nu,self.Nku,self.Nkv,self.Nkn,self.k,self.u,self.v,self.n,self.alpha,self.beta,self.gamma,X,Z,pre_n)
 
     def update_alpha(self):
         # https://www.techscore.com/blog/2015/06/16/dmm/
@@ -223,7 +281,7 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z):
     X: event tensor
     Z: topic assignments of the previous iteration
     """
-    Nu = X.sum(axis=(1, 2))
+    Nu = X.sum(axis=(1, 2))#怪しい
     # for t in trange(self.n, desc='#### Infering Z'):
     for t in range(n):
         for i in range(u):
@@ -238,13 +296,13 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z):
                     Nku[topic, i] -= count
                     Nkv[topic, j] -= count
                     Nkn[topic, t] -= count
-                #     if ((self.Nk  < 0).sum() > 0 or
-                #         (self.Nkv < 0).sum() > 0 or
-                #         (self.Nku < 0).sum() > 0 or
-                #         (self.Nkn < 0).sum() > 0):
-                #         print("Invalid counter N has been found")
-                #         # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
-                #         exit()
+                    # if ((Nk  < 0).sum() > 0 or
+                    #     (Nkv < 0).sum() > 0 or
+                    #     (Nku < 0).sum() > 0 or
+                    #     (Nkn < 0).sum() > 0):
+                    #     print("Invalid counter N has been found")
+                    #     # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
+                    #     exit()
                 """ compute posterior distribution """
                 posts = np.zeros(k)
                 # print(self.Nku[:, i])
@@ -266,4 +324,59 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z):
                 Nku[topic, i] += count
                 Nkv[topic, j] += count
                 Nkn[topic, t] += count
+    return Z
+
+# @numba.jit #(nopython=True)
+def _online_sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z,pre_n):
+    """
+    X: event tensor
+    Z: topic assignments of the previous iteration
+    """
+    Nu = X.sum(axis=(1, 2))
+    print(Nu.shape)
+    exit()
+    # for t in trange(self.n, desc='#### Infering Z'):
+    for t in range(pre_n,n):
+        for i in range(u):
+            for j in range(v):
+                # for each non-zero event entry,
+                count = X[i, j, t]
+                for e in range(count):    
+                    # assign latent topic, z
+                    topic = Z[i, j, t]
+                    if count == 0:
+                        continue
+                    if not topic == -1:
+                        Nk[topic] -= count
+                        Nku[topic, i] -= count
+                        Nkv[topic, j] -= count
+                        Nkn[topic, t] -= count
+                        # if ((Nk  < 0).sum() > 0 or
+                        #     (Nkv < 0).sum() > 0 or
+                        #     (Nku < 0).sum() > 0 or
+                        #     (Nkn < 0).sum() > 0):
+                        #     print("Invalid counter N has been found")
+                        #     # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
+                        #     exit()
+                    """ compute posterior distribution """
+                    posts = np.zeros(k)
+                    # print(self.Nku[:, i])
+                    # print(self.Nkv[:, j])
+                    # print(self.Nkn[:, t])
+                    for r in range(k):
+                        # NOTE: Nk[r] = Nkv[r, :].sum() = Nkn[r, :].sum()
+                        O = A = C = 1
+                        O = (Nku[r, i] + alpha) / (Nu[i] + alpha * k)
+                        A = (Nkv[r, j] + beta) / (Nk[r] + beta  * v)
+                        C = (Nkn[r, t] + gamma) / (Nk[r] + gamma * n)
+                        # print(O.shape,A.shape,C.shape)
+                        posts[r] = O * A * C
+                    posts = posts / posts.sum()  # normalize
+                    topic = np.argmax(np.random.multinomial(1, posts))
+                    # print(topic, '<-', posts)
+                    Z[i, j, t] = topic
+                    Nk[topic] += count
+                    Nku[topic, i] += count
+                    Nkv[topic, j] += count
+                    Nkn[topic, t] += count
     return Z

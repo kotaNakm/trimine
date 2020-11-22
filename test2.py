@@ -12,8 +12,12 @@ from trimine import TriMine
 
 
 if __name__ == '__main__':
-    
-    input_tag = 'us_ele'
+
+    input_tag = 'us_ele' #
+    # input_tag = 'online_retail_a1' #(4631, 36, 17713)
+    # input_tag = 'online_retail_a2' #(36, 4631, 17713)
+
+
     tensor = np.load(f'../{input_tag}.npy')
     outputdir = '../tirmine_result/' + input_tag +'/'
     
@@ -29,7 +33,7 @@ if __name__ == '__main__':
 
     # Infer TriMine's parameters
     start_time = time.process_time()
-    trimine.infer(tensor, n_iter=10)
+    trimine.infer(tensor, n_iter=50)#20
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time: {elapsed_time:.2f} [sec]')
 
@@ -37,6 +41,7 @@ if __name__ == '__main__':
 
     O, A, C = trimine.get_factors()
 
+    plt.figure(figsize=(15,4))
     plt.plot(O)
     plt.title('Object matrix, O')
     plt.xlabel('Objects')
@@ -44,6 +49,7 @@ if __name__ == '__main__':
     plt.savefig(outputdir + 'O.png')
     plt.close()
 
+    plt.figure(figsize=(15,4))
     plt.plot(A)
     plt.title('Actor matrix, A')
     plt.xlabel('Actors')
@@ -51,6 +57,7 @@ if __name__ == '__main__':
     plt.savefig(outputdir + 'A.png')
     plt.close()
 
+    plt.figure(figsize=(15,4))
     plt.plot(C)
     plt.title('Time matrix, C')
     plt.xlabel('Time')
