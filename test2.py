@@ -13,13 +13,14 @@ from trimine import TriMine
 
 if __name__ == '__main__':
 
-    # input_tag = 'us_ele' #
+    input_tag = 'us_ele' #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
-    input_tag = 'online_retail_a2' #(36, 4631, 17713)
-
+    # input_tag = 'online_retail_a2' #(36, 4631, 17713)
+    # input_tag = 'HVFTV_h_1' #
+    # input_tag = 'HVFTV_m_1' #
 
     tensor = np.load(f'../{input_tag}.npy')
-    outputdir = '../tirmine_result/' + input_tag +'/'
+    outputdir = '../trimine_result/' + input_tag +'/'
     
     if os.path.exists(outputdir):
         shutil.rmtree(outputdir)
@@ -28,12 +29,13 @@ if __name__ == '__main__':
     sns.set()
 
     u, v, n = tensor.shape
-    k = 5
+    k = 3
     trimine = TriMine(k, u, v, n, outputdir)
+    trimine.save_model()
 
     # Infer TriMine's parameters
     start_time = time.process_time()
-    trimine.infer(tensor, n_iter=50)#20
+    trimine.infer(tensor, n_iter=20)#20 #50
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time: {elapsed_time:.2f} [sec]')
 
@@ -42,7 +44,7 @@ if __name__ == '__main__':
     O, A, C = trimine.get_factors()
 
     plt.figure(figsize=(15,4))
-    plt.plot(O)
+    plt.plot(O,alpha=0.8)
     plt.title('Object matrix, O')
     plt.xlabel('Objects')
     plt.ylabel('Topic')
@@ -50,7 +52,7 @@ if __name__ == '__main__':
     plt.close()
 
     plt.figure(figsize=(15,4))
-    plt.plot(A)
+    plt.plot(A,alpha=0.8)
     plt.title('Actor matrix, A')
     plt.xlabel('Actors')
     plt.ylabel('Topic')
@@ -58,7 +60,7 @@ if __name__ == '__main__':
     plt.close()
 
     plt.figure(figsize=(15,4))
-    plt.plot(C)
+    plt.plot(C,alpha=0.8)
     plt.title('Time matrix, C')
     plt.xlabel('Time')
     plt.ylabel('Topic')

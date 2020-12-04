@@ -8,11 +8,73 @@ from tqdm import trange
 import numba
 import copy
 from hmmlearn.hmm import GaussianHMM
+import time
 
 MINK = 1
 MAXK = 8
+N_INFER_ITER_HMM = 1
+ZERO = 1.e-10
 
 # https://github.com/scikit-learn/scikit-learn/blob/7e85a6d1f/sklearn/decomposition/_online_lda.py#L135
+
+
+class Regime(object):
+    def __init__(self):
+        self.costC = np.inf
+        self.costT = np.inf
+
+        """
+        k,u,v,n
+        O,A,C
+        alpha,beta
+        model
+        """
+
+    def get_params(self, **kwargs):
+        return self.alpha, self.beta, self.gamma
+
+    def get_factors(self):
+        return self.O, self.A, self.C
+
+    def estimate_hmm(self,X):
+        min_ = np.inf
+        opt_k = MINK
+        # pp.pprint(regime.subs)
+        for k in range(MINK, MAXK):
+            prev = min_
+            model = _estimate_hmm_k(X,k)
+            score = model.score(X)
+            # print(regime.costT)
+            if score > prev:
+                opt_k = k - 1
+                break
+        if opt_k < MINK: opt_k = MINK
+        if opt_k > MAXK: opt_k = MAXK
+        print(f'opt_k:{opt_k}')
+        self.model = _estimate_hmm_k(X, opt_k)
+        fit_predict = self.model.predict(X)
+        # print(self.model.startprob_)
+        # print(fit_predict)
+        # print(self.model.get_stationary_distribution())
+        # print(self.model.means_)
+        # print(self.model.covars_)
+        
+    def compute_total(self):
+        llh = loggamma(self.alpha * self.k) - self.k * loggamma(self.alpha)
+        # llh += loggamma(self.alpha * self.u) - self.u * loggamma(self.alpha)
+        llh += loggamma(self.beta * self.k) - self.k * loggamma(self.beta)
+        print(f'llh:{llh}')
+        for i in range(self.k):
+            llh += (self.alpha - 1) * sum([np.log(self.O[j, i]) for j in range(self.u)]) / self.u
+            llh += (self.beta  - 1) * sum([np.log(self.A[j, i]) for j in range(self.v)]) / self.v
+        print(f'llh:{llh}')
+        costC_hyp = - llh
+        costC_hmm = - self.model.score(self.C)/ np.log(2)
+        self.costC =  costC_hmm + costC_hyp
+        print(costC_hyp)
+        print(costC_hmm)
+        print(self.costC)
+        exit()
 
 class TriMine(object):
     def __init__(self, k, u, v, n, outputdir):
@@ -28,20 +90,20 @@ class TriMine(object):
         self.max_gamma = 10
         self.init_params()
 
+        self.regimes=[]
+        r_g = Regime()
+        self.regimes.append(r_g)
 
     def init_params(self, alpha=None, beta=None, gamma=None):
         """ Initialize model parameters """
-
         # if parameter > 1: pure
         # if parameter < 1: mixed
         self.alpha = 0.0005/self.k  #self.u
         self.beta  = 5  #self.v
         self.gamma = 5 #self.n
-
         self.O = np.zeros((self.u, self.k))  # Object matrix
         self.A = np.zeros((self.v, self.k))  # Actor matrix
-        self.C = np.zeros((self.n, self.k))  # Time matrix
-
+        self.C = np.zeros((self.n, self.k))  # Time matrix   
 
     def init_status(self,tensor):
         self.Nk = np.zeros(self.k, dtype=int)
@@ -52,42 +114,51 @@ class TriMine(object):
         # self.Z = np.full((self.u, self.v, self.n), -1)
         self.Nsum = tensor.sum()
         self.Z = np.full((self.Nsum), -1)
-        
-
+    
     def update_status(self,tensor,pre_n):
         tmp_Nkn = self.Nkn
         tmp_Z = self.Z
         pre_Nsum = self.Nsum
         self.Nsum += tensor.sum()
-
         self.Nkn = np.zeros((self.k, self.n), dtype=int)
         self.Z = np.full((self.Nsum), -1)
-
         self.Nkn[:,:pre_n] = tmp_Nkn
         self.Z[:pre_Nsum] = tmp_Z
-
+    
     def get_params(self, **kwargs):
         return self.alpha, self.beta, self.gamma
-
 
     def get_factors(self):
         return self.O, self.A, self.C
 
+    def init_regime(self,tensor,rgm_id):
+        regime = self.regimes[rgm_id]
+        
+        regime.estimate_hmm(self.C)     
+        self.update_O_A(tensor,regime.model)
+        
 
-    def infer(self, tensor, n_iter=10, tol=1.e-8,
+        regime.k = self.k;regime.u = self.u;regime.v = self.v;regime.n = self.n
+        regime.alpha = self.alpha;regime.beta = self.beta        
+        regime.O = self.O;regime.A = self.A;regime.C = self.C
+        
+        regime.compute_total()
+
+
+    def init_infer(self, tensor, n_iter=10, tol=1.e-8,
               init=True, verbose=True):
         """
         Given: a tensor (actors * objects * time)
         Find: matrices, O, A, C
         """
+
         if init == True:
             self.init_status(tensor)
 
         for iteration in range(n_iter):
-            # print(self.Nku)
             # Sampling hidden topics z, i.e., Equation (1)
             self.Z = self.sample_topic(tensor, self.Z, 0,0)
-            
+
             # Update parameters
             self.update_alpha()
             self.update_beta()
@@ -116,9 +187,46 @@ class TriMine(object):
             plt.ylabel('Log-likelihood')
             plt.savefig(self.outputdir + 'train_log.png')
             plt.close()
+    
+    def update_O_A(self, tensor, model, n_iter=10, tol=1.e-8,verbose=True):
+
+        for iteration in range(n_iter):
+            # Sampling hidden topics z, i.e., Equation (1)
+            start_time = time.process_time()
+            self.Z = self.sampleZ_pickC(tensor,model,self.Z, 0, 0)
+            print(f'{iteration}::::{time.process_time()-start_time}')
+
+            # Update parameters
+            self.update_alpha()
+            self.update_beta()
+        exit()
+        #compute O & A    
+        for i in range(self.k):
+            for j in range(self.u):
+                self.O[j, i] = (
+                    (self.Nku[i, j] + self.alpha)
+                    / (self.Nu[j] + self.alpha * self.k))
+            for j in range(self.v):
+                self.A[j, i] = (
+                    (self.Nkv[i, j] + self.beta)
+                    / (self.Nk[i] + self.v * self.beta))
+        
+        if verbose == True:
+            # Print learning log
+            # print('Iteration', iteration + 1)
+            # print('loglikelihood=\t', llh)
+            print(f'| alpha\t| {self.alpha:.3f}')
+            print(f'| beta \t| {self.beta:.3f} ')
+            print(f'| gamma\t| {self.gamma:.3f}')
+            # Save learning log
+            # plt.plot(self.train_log)
+            # plt.xlabel('Iterations')
+            # plt.ylabel('Log-likelihood')
+            # plt.savefig(self.outputdir + 'train_log.png')
+            # plt.close()
         
 
-    def infer_online(self, tensor, n_iter=10, tol=1.e-8,verbose=True):
+    def infer_online_HMM(self, tensor, n_iter=10, tol=1.e-8,verbose=True):
         """
         Given: a tensor (actors * objects * time)
         Find: matrices, O, A, C
@@ -166,7 +274,6 @@ class TriMine(object):
             plt.ylabel('Log-likelihood')
             plt.savefig(self.outputdir + 'train_log.png')
             plt.close()
-    
 
     def loglikelihood(self):
         """ Compute Log-likelihood """
@@ -189,6 +296,9 @@ class TriMine(object):
 
     def sample_topic(self, X, Z, pre_n,cnt):
         return _sample_topic(self.Nk,self.Nu,self.Nku,self.Nkv,self.Nkn,self.k,self.u,self.v,self.n,self.alpha,self.beta,self.gamma,X,Z,pre_n,cnt)
+
+    def sampleZ_pickC(self, X, model, Z, pre_n, cnt):
+        return _sampleZ_pickC(self.Nk,self.Nu,self.Nku,self.Nkv,self.Nkn,self.k,self.u,self.v,self.n,self.alpha,self.beta,self.gamma,X,model,Z,pre_n,cnt)
 
     def update_alpha(self):
         # https://www.techscore.com/blog/2015/06/16/dmm/
@@ -357,58 +467,76 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z,pre_n,cnt):
                     cnt+=1
     return Z
 
-# @numba.jit #(nopython=True)
-# def _online_sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z,pre_n):
-#     """
-#     X: event tensor
-#     Z: topic assignments of the previous iteration
-#     """
-#     Nu = X.sum(axis=(1, 2))
-#     print(Nu.shape)
-#     exit()
-#     # for t in trange(self.n, desc='#### Infering Z'):
-#     for t in range(pre_n,n):
-#         for i in range(u):
-#             for j in range(v):
-#                 # for each non-zero event entry,
-#                 count = X[i, j, t]
-#                 for e in range(count):    
-#                     # assign latent topic, z
-#                     topic = Z[i, j, t]
-#                     if count == 0:
-#                         continue
-#                     if not topic == -1:
-#                         Nk[topic] -= count
-#                         Nku[topic, i] -= count
-#                         Nkv[topic, j] -= count
-#                         Nkn[topic, t] -= count
-#                         # if ((Nk  < 0).sum() > 0 or
-#                         #     (Nkv < 0).sum() > 0 or
-#                         #     (Nku < 0).sum() > 0 or
-#                         #     (Nkn < 0).sum() > 0):
-#                         #     print("Invalid counter N has been found")
-#                         #     # print(self.Nk,self.Nkv,self.Nku,self.Nkn)
-#                         #     exit()
-#                     """ compute posterior distribution """
-#                     posts = np.zeros(k)
-#                     # print(self.Nku[:, i])
-#                     # print(self.Nkv[:, j])
-#                     # print(self.Nkn[:, t])
-#                     for r in range(k):
-#                         # NOTE: Nk[r] = Nkv[r, :].sum() = Nkn[r, :].sum()
-#                         O = A = C = 1
-#                         O = (Nku[r, i] + alpha) / (Nu[i] + alpha * k)
-#                         A = (Nkv[r, j] + beta) / (Nk[r] + beta  * v)
-#                         C = (Nkn[r, t] + gamma) / (Nk[r] + gamma * n)
-#                         # print(O.shape,A.shape,C.shape)
-#                         posts[r] = O * A * C
-#                     posts = posts / posts.sum()  # normalize
-                    
-#                     topic = np.argmax(np.random.multinomial(1, posts))
-#                     # print(topic, '<-', posts)
-#                     Z[i, j, t] = topic
-#                     Nk[topic] += count
-#                     Nku[topic, i] += count
-#                     Nkv[topic, j] += count
-#                     Nkn[topic, t] += count
-#     return Z
+@numba.jit #(nopython=True)
+def _sampleZ_pickC(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,model,Z,pre_n,cnt):
+
+    Nu = X.sum(axis=(1, 2))
+    # for t in trange(self.n, desc='#### Infering Z'):
+    mat_C = np.zeros((n-pre_n,k))
+
+    cnt=cnt
+    # C_sample = model.sample(n-pre_n)[0]
+    # C_sample = np.where(C_sample<ZERO,ZERO,C_sample)
+    # print(C_sample)
+
+    for t in range(pre_n,n):
+        for i in range(u):
+            for j in range(v):
+                # for each non-zero event entry,
+                # assign latent topic, z
+                count =  X[i, j, t-pre_n]
+                if count == 0:
+                        continue
+                tmp_C = np.zeros((count,k))
+                for tmp_cnt in range(count):
+                    topic = Z[cnt]
+                    if not topic == -1:
+                        Nk[topic] -= 1
+                        Nku[topic, i] -= 1
+                        Nkv[topic, j] -= 1
+
+                    """ compute posterior distribution """
+                    posts = np.zeros(k)
+                    # print(self.Nku[:, i])
+                    # print(self.Nkv[:, j])
+                    # print(self.Nkn[:, t])
+                    for r in range(k):
+                        # NOTE: Nk[r] = Nkv[r, :].sum() = Nkn[r, :].sum()
+                        O = A = C = 1
+                        O = (Nku[r, i] + alpha) / (Nu[i] + alpha * k)
+                        A = (Nkv[r, j] + beta) / (Nk[r] + beta  * v)
+                        # C = C_sample[r,t]
+                        C = model.sample(n-pre_n)[0][r,t] 
+                        C = ZERO if C < ZERO else C
+                        tmp_C[tmp_cnt,r] = C
+                        # print(O,A,C)
+                        # print(O.shape,A.shape,C.shape)
+                        # posts[r] = float('{:.5g}'.format(O * A * C))
+                        posts[r] = O * A * C
+                    posts = posts /(posts.sum()*1.1) # normalize with bias
+                    if posts.sum()>1 or posts.sum()<0:
+                        print(posts)
+                    #to avoid greater than one
+                    #https://github.com/numba/numba/issues/3426
+
+                    topic = np.argmax(np.random.multinomial(1, posts))
+                    # print(topic, '<-', posts)
+                    Z[cnt] = topic
+                    Nk[topic] += 1
+                    Nku[topic, i] += 1
+                    Nkv[topic, j] += 1
+                    cnt+=1
+                print(tmp_C)
+                print(tmp_C.shape)
+                print(np.mean(tmp_C,axis=0))
+                mat_C[t,:] = np.mean(tmp_C,axis=0)
+    return Z#,mat_C
+
+
+def _estimate_hmm_k(X,k=1):
+    model = GaussianHMM(n_components=k,
+                               covariance_type='diag',
+                               n_iter=N_INFER_ITER_HMM)
+    model.fit(X)
+    return model
+    

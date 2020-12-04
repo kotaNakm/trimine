@@ -53,7 +53,7 @@ if __name__ == '__main__':
     # input_tag = 'HVFTV_m_1'
 
     tensor = np.load(f'../{input_tag}.npy')
-    outputdir = '../trimine_result_stream/' + input_tag +'/'
+    outputdir = '../trimine_result_stream_update/' + input_tag +'/'
     
     if os.path.exists(outputdir):
         shutil.rmtree(outputdir)
@@ -77,12 +77,14 @@ if __name__ == '__main__':
     os.makedirs(outputdir_s)
 
     start_time = time.process_time()
-    trimine.infer(tensor[:,:,:train_n], n_iter=10)#20 #50
+    tensor_T = tensor[:,:,:train_n]
+    trimine.init_infer(tensor_T, n_iter=10)#20 #50
+    trimine.init_regime(tensor_T,0)
+
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time(train): {elapsed_time:.2f} [sec]')
     trimine.save_model()
     factors_plot(trimine)
-
 
 
     #strem
@@ -96,7 +98,7 @@ if __name__ == '__main__':
         os.makedirs(outputdir_s)
         
         start_time = time.process_time()
-        trimine.infer_online(tensor[:,:,i:i+width], n_iter=5,verbose=True)#20 #50
+        trimine.infer_online_HMM(tensor[:,:,i:i+width], n_iter=5,verbose=True)#20 #50
         elapsed_time = time.process_time() - start_time
         print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
         trimine.save_model()
