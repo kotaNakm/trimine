@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     start_time = time.process_time()
     tensor_T = tensor[:,:,:train_n]
-    trimine.init_infer(tensor_T, n_iter=10)#20 #50
+    trimine.init_infer(tensor_T, n_iter=10)#10 #20 #50
     trimine.init_regime(tensor_T,0)
 
     elapsed_time = time.process_time() - start_time
@@ -89,8 +89,12 @@ if __name__ == '__main__':
 
     #strem
     width=50
+    start_time_stream = time.process_time()
+    prev_n = train_n
+    tensor_S = tensor[:,:,prev_n:prev_n+width]
+    path = []
     for i in range(train_n,n,width):
-
+        cur_n = i+width
         outputdir_s=outputdir+str(i)+'/'
         trimine.outputdir = outputdir_s
         if os.path.exists(outputdir_s):
@@ -98,9 +102,15 @@ if __name__ == '__main__':
         os.makedirs(outputdir_s)
         
         start_time = time.process_time()
-        trimine.infer_online_HMM(tensor[:,:,i:i+width], n_iter=5,verbose=True)#20 #50
+        shift_flag = trimine.infer_online_HMM(tensor[:,:,prev_n:cur_n], prev_n, cur_n, n_iter=10,verbose=True)#20 #50
         elapsed_time = time.process_time() - start_time
         print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
         trimine.save_model()
         factors_plot(trimine)
-        
+        if shift_flag:
+            prev_n = i
+            path.append([shift_flag,prev_n])
+
+    elapsed_time = time.process_time() - start_time_stream
+    print(f'Elapsed time(all stream processing): {elapsed_time:.2f} [sec]')
+    
