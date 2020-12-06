@@ -43,13 +43,12 @@ def factors_plot(trimine):
     plt.close()
 
 
-
 if __name__ == '__main__':
 
-    input_tag = 'us_ele' #
+    # input_tag = 'us_ele' #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
-    # input_tag = 'HVFTV_h_1' #
+    input_tag = 'HVFTV_h_1' #
     # input_tag = 'HVFTV_m_1'
 
     tensor = np.load(f'../{input_tag}.npy')
@@ -88,7 +87,7 @@ if __name__ == '__main__':
 
 
     #strem
-    width=50
+    width=200
     start_time_stream = time.process_time()
     prev_n = train_n
     tensor_S = tensor[:,:,prev_n:prev_n+width]

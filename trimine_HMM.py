@@ -62,6 +62,7 @@ class Regime(object):
 
         return llh
 
+
     def compute_costM(self):
         return 20
 
@@ -137,7 +138,7 @@ class TriMine(object):
         # print(tmp_Z.shape)
         self.Z[:self.prev_Nsum] = tmp_Z[:self.prev_Nsum]
 
-        #init param
+        #init param regime変わったらtrackしているparameterを更新前にもどしたい
         prev_rgm = self.regimes[self.prev_rgm_id]
         self.alpha = prev_rgm.alpha
         self.beta  = prev_rgm.beta
@@ -145,7 +146,8 @@ class TriMine(object):
         print(f'alpha:{self.alpha}')
         print(f'beta:{self.beta}')
         print(f'gamma{self.gamma}')
-    
+
+
     def get_params(self, **kwargs):
         return self.alpha, self.beta, self.gamma
 
@@ -159,8 +161,7 @@ class TriMine(object):
         regime.k = self.k;regime.u = self.u;regime.v = self.v;regime.n = self.n
         regime.alpha = self.alpha;regime.beta = self.beta;regime.gamma = self.gamma    
         regime.O = self.O;regime.A = self.A;regime.C = self.C
-        
-        regime.costC = regime.compute_costC(self.O,self.A,self.C,0,self.n)
+
         regime.costM = regime.compute_costM()
 
         print(regime.costC)
@@ -193,7 +194,7 @@ class TriMine(object):
             self.compute_factors(0)
 
             # Compute log-likelihood
-            llh = self.loglikelihood(0)
+            llh = self.loglikelihood(0,self.alpha,self.beta,self.gamma)
             self.train_log.append(llh)
 
             # Early break
@@ -201,10 +202,13 @@ class TriMine(object):
                 if np.abs(self.train_log[-1] - self.train_log[-2]) < tol:
                     print('Early stopping')
                     break
-    
+        
         self.estimate_hmm(self.C)
         self.prev_cnt = cnt 
         self.prev_Nsum = self.Nsum
+        self.init_regime(tensor,0)
+        self.regimes[0].costC = llh 
+
         if verbose == True:
             # Print learning log
             print('Iteration', iteration + 1)
@@ -217,45 +221,7 @@ class TriMine(object):
             plt.xlabel('Iterations')
             plt.ylabel('Log-likelihood')
             plt.savefig(self.outputdir + 'train_log.png')
-            plt.close()
-    
-    # def update_O_A(self, tensor, model, n_iter=10, tol=1.e-8,verbose=True):
-
-    #     for iteration in range(n_iter):
-    #         # Sampling hidden topics z, i.e., Equation (1)
-    #         start_time = time.process_time()
-    #         self.Z = self.sampleZ_pickC(tensor,model,self.Z, 0, 0)
-    #         print(f'{iteration}::::{time.process_time()-start_time}')
-
-    #         # Update parameters
-    #         self.update_alpha()
-    #         self.update_beta()
-    #     exit()
-    #     #compute O & A    
-    #     for i in range(self.k):
-    #         for j in range(self.u):
-    #             self.O[j, i] = (
-    #                 (self.Nku[i, j] + self.alpha)
-    #                 / (self.Nu[j] + self.alpha * self.k))
-    #         for j in range(self.v):
-    #             self.A[j, i] = (
-    #                 (self.Nkv[i, j] + self.beta)
-    #                 / (self.Nk[i] + self.v * self.beta))
-        
-    #     if verbose == True:
-    #         # Print learning log
-    #         # print('Iteration', iteration + 1)
-    #         # print('loglikelihood=\t', llh)
-    #         print(f'| alpha\t| {self.alpha:.3f}')
-    #         print(f'| beta \t| {self.beta:.3f} ')
-    #         print(f'| gamma\t| {self.gamma:.3f}')
-    #         # Save learning log
-    #         # plt.plot(self.train_log)
-    #         # plt.xlabel('Iterations')
-    #         # plt.ylabel('Log-likelihood')
-    #         # plt.savefig(self.outputdir + 'train_log.png')
-    #         # plt.close()
-        
+            plt.close()        
 
     def infer_online_HMM(self, tensor, pre_n, cur_n, n_iter=10, tol=1.e-8,verbose=True):
         """
@@ -271,7 +237,9 @@ class TriMine(object):
         self.n = cur_n
         cnt = self.prev_cnt
         # self.update_status(tensor,prev_iter_n)        
-        self.update_status(tensor,pre_n)        
+        # self.update_status(tensor,pre_n)
+        self.init_status(tensor)        
+        self.train_log = []
 
         for iteration in range(n_iter):
             # Sampling hidden topics z, i.e., Equation (1)
@@ -282,6 +250,13 @@ class TriMine(object):
             self.update_beta()
             self.update_gamma(pre_n)
 
+            
+
+            self.compute_factors(pre_n)
+            # Compute log-likelihood
+            self.llh = self.loglikelihood(pre_n,self.alpha,self.beta,self.gamma)
+            self.train_log.append(self.llh)
+
             # Early break
             if iteration > 0:
                 if np.abs(self.train_log[-1] - self.train_log[-2]) < tol:
@@ -289,30 +264,25 @@ class TriMine(object):
                     break
                     self.compute_factors(pre_n)
 
-        self.compute_factors(pre_n)
-        # Compute log-likelihood
-        self.llh = self.loglikelihood(pre_n)
-        self.train_log.append(self.llh)
-
-        if verbose == True:
-            # Print learning log
-            # print('Iteration', iteration + 1)
-            print('loglikelihood=\t', self.llh)
-            print(f'| alpha\t| {self.alpha:.3f}')
-            print(f'| beta \t| {self.beta:.3f} ')
-            print(f'| gamma\t| {self.gamma:.3f}')
-            # Save learning log
-            plt.plot(self.train_log)
-            plt.xlabel('Iterations')
-            plt.ylabel('Log-likelihood')
-            plt.savefig(self.outputdir + 'train_log.png')
-            plt.close()
+            if verbose == True:
+                # Print learning log
+                # print('Iteration', iteration + 1)
+                print('loglikelihood=\t', self.llh)
+                print(f'| alpha\t| {self.alpha:.3f}')
+                print(f'| beta \t| {self.beta:.3f} ')
+                print(f'| gamma\t| {self.gamma:.3f}')
+                # Save learning log
+                plt.plot(self.train_log)
+                plt.xlabel('Iterations')
+                plt.ylabel('Log-likelihood')
+                plt.savefig(self.outputdir + 'train_log.png')
+                plt.close()
         
         shift_flag = self.model_compressinon(pre_n,new_cnt)
 
         return shift_flag
 
-    def loglikelihood(self,pre_n):
+    def loglikelihood(self,pre_n,alpha,beta,gamma):
         """ Compute Log-likelihood """
 
         # Symmetric dirichlet distribution
@@ -323,16 +293,33 @@ class TriMine(object):
         # print(range(pre_n,self.n))
         # print(self.C.shape)
 
-        llh = 0
-        llh = loggamma(self.alpha * self.k) - self.k * loggamma(self.alpha)
-        # llh += loggamma(self.alpha * self.u) - self.u * loggamma(self.alpha)
-        llh += loggamma(self.beta * self.k) - self.k * loggamma(self.beta)
-        llh += loggamma(self.gamma * self.k) - self.k * loggamma(self.gamma)
+        #version python
+        # llh = 0
+        # llh = loggamma(self.alpha * self.k) - self.k * loggamma(self.alpha)
+        # # llh += loggamma(self.alpha * self.u) - self.u * loggamma(self.alpha)
+        # llh += loggamma(self.beta * self.k) - self.k * loggamma(self.beta)
+        # llh += loggamma(self.gamma * self.k) - self.k * loggamma(self.gamma)
 
+        # for i in range(self.k):
+        #     llh += (self.alpha - 1) * sum([np.log(self.O[j, i]) for j in range(self.u)]) / self.u
+        #     llh += (self.beta  - 1) * sum([np.log(self.A[j, i]) for j in range(self.v)]) / self.v
+        #     llh += (self.gamma - 1) * sum([np.log(self.C[j, i]) for j in range(pre_n,self.n)]) / (self.n-pre_n)
+
+        # return llh
+
+
+        #version C
+        llh = 0
+        llh = self.u * loggamma(alpha * self.k) - self.u * self.k * loggamma(alpha)
+        llh += self.k * loggamma(beta * self.v) - self.k * self.v * loggamma(beta)
+        for i in range(self.u):
+            llh -= loggamma(self.Nu[i] + alpha * self.k)
+            for j in range(self.k):
+                llh += loggamma(self.Nku[j][i] + alpha)
         for i in range(self.k):
-            llh += (self.alpha - 1) * sum([np.log(self.O[j, i]) for j in range(self.u)]) / self.u
-            llh += (self.beta  - 1) * sum([np.log(self.A[j, i]) for j in range(self.v)]) / self.v
-            llh += (self.gamma - 1) * sum([np.log(self.C[j, i]) for j in range(pre_n,self.n)]) / (self.n-pre_n)
+            llh -= loggamma(self.Nk[i] + beta * self.v)
+            for j in range(self.v):
+                llh += loggamma(self.Nkv[i][j] + beta)
 
         return llh
 
@@ -345,7 +332,6 @@ class TriMine(object):
     def update_alpha(self):
         # https://www.techscore.com/blog/2015/06/16/dmm/
         num = -1 * self.u * self.k * digamma(self.alpha)
-
         den = -1 * self.u * self.k * digamma(self.alpha * self.u)
         for i in range(self.k):
             den += self.u * digamma(self.Nk[i] + self.alpha * self.u)
@@ -388,17 +374,34 @@ class TriMine(object):
         # print(pre_n)
         # print(self.n)
         # print(self.Nkn.shape)
-        # print(self.n - pre_n)
+        
+        # print(self.n-pre_n)
+        # print(self.Nk)
+        # print(np.sum(self.Nk))
+        # print(self.Nkn)
 
-        num = -1 * self.k * (self.n-pre_n) * digamma(self.gamma)
-        den = -1 * self.k * (self.n-pre_n) * digamma(self.gamma * (self.n-pre_n))
+
+        num = -1 * self.k * self.n * digamma(self.gamma)
+        den = -1 * self.k * self.n * digamma(self.gamma * self.n)
 
         for i in range(self.k):
-            den += self.n * digamma(self.Nk[i] + self.gamma * (self.n-pre_n))
-            for j in range(pre_n,self.n):
-                # print(j)
+            den += self.n * digamma(self.Nk[i] + self.gamma * self.n)
+            for j in range(self.n):
                 num += digamma(self.Nkn[i, j] + self.gamma)
 
+        # num = -1 * self.k * (self.n-pre_n) * digamma(self.gamma)
+        # den = -1 * self.k * (self.n-pre_n) * digamma(self.gamma * (self.n-pre_n))
+        # # print(num)
+        # # print(den)
+        # # print('============')
+        # for i in range(self.k):
+        #     den += self.n * digamma(self.Nk[i] + self.gamma * (self.n-pre_n))
+        #     for j in range(pre_n,self.n):
+        #         # print(j)
+        #         num += digamma(self.Nkn[i, j] + self.gamma)
+        #         print(num)
+        # print(num)
+        
         self.gamma *= num / den
 
         if self.gamma > self.max_gamma:
@@ -468,19 +471,23 @@ class TriMine(object):
         costM = 20       
         cost_1 = self.llh + costM
         print(f'new_regime:::{cost_1}')
-        
+
+        prev_rgm = self.regimes[self.prev_rgm_id]
         #直近とコスト比較
-        cost_0 = self.regimes[self.prev_rgm_id].compute_costC(self.O,self.A,self.C,pre_n,self.n)
+        cost_0 = self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma)
         print(f'prev_regime:::{cost_0}')
 
         print('=========================================')
         print(f"{cost_0} vs {cost_1}")
         print('=========================================')
-
+        print(f'diff::{cost_1-cost_0}')
         if cost_0 >cost_1:
             self.prev_cnt = cnt
             #チェック↓
             self.prev_Nsum = self.Nsum#######################################################################################
+            
+
+            
             exit()
         #shiftしたら過去全部と比較
         # min_ = np.inf
@@ -513,7 +520,6 @@ class TriMine(object):
         np.savetxt(self.outputdir + 'A.txt', self.A)
         np.savetxt(self.outputdir + 'C.txt', self.C)
         np.savetxt(self.outputdir + 'train_log.txt', self.train_log)
-
 
 @numba.jit #(nopython=True)
 def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z,pre_n,cnt):
@@ -587,8 +593,8 @@ def _sampleZ_pickC(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,model,Z,pre_n,cn
     # C_sample = model.sample(n-pre_n)[0]
     # C_sample = np.where(C_sample<ZERO,ZERO,C_sample)
     # print(C_sample)
-
-    print(pre_n,n)
+    # print(pre_n,n)
+    
     # means=[2,2,2,2]
     # sum_means = 8
 
@@ -631,6 +637,7 @@ def _sampleZ_pickC(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,model,Z,pre_n,cn
                         O = A = C = 1
                         O = (Nku[r, i] + alpha) / (Nu[i] + alpha * k)
                         A = (Nkv[r, j] + beta) / (Nk[r] + beta  * v)
+                        # C = (Nkn[r, t] + gamma) / (Nk[r] + gamma * n)
                         C = (Nkn[r, t] + gamma + means[r]) / (Nk[r] + gamma * n + sum_means)
                         # C = C_sample[r,t]
                         # C = model.sample(n-pre_n)[0][r,t] 
