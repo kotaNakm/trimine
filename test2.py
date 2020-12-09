@@ -13,10 +13,10 @@ from trimine import TriMine
 
 if __name__ == '__main__':
 
-    input_tag = 'us_ele' #
+    # input_tag = 'us_ele' #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
-    # input_tag = 'HVFTV_h_1' #
+    input_tag = 'HVFTV_h_1' #
     # input_tag = 'HVFTV_m_1' #
 
     tensor = np.load(f'../{input_tag}.npy')

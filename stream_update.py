@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     
     u, v, n = tensor.shape
-    k = 4
+    k = 3
 
     #train
     train_n = math.floor(n*TR)
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
 
     #strem
-    width=200
+    width=20
     start_time_stream = time.process_time()
     prev_n = train_n
     tensor_S = tensor[:,:,prev_n:prev_n+width]

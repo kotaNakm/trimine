@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
 
     #strem
-    width=50
+    width=20
     for i in range(train_n,n,width):
 
         outputdir_s=outputdir+str(i)+'/'

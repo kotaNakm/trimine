@@ -23,9 +23,9 @@ class TriMine(object):
         self.n = n  # data duration
         self.outputdir = outputdir
         self.train_log = []
-        self.max_alpha = 0.001
-        self.max_beta  = 10
-        self.max_gamma = 10
+        self.max_alpha = 1#100 #0.001
+        self.max_beta  = 1#10
+        self.max_gamma = 1#10
         self.init_params()
 
 
@@ -34,9 +34,9 @@ class TriMine(object):
 
         # if parameter > 1: pure
         # if parameter < 1: mixed
-        self.alpha = 0.0005/self.k  #self.u
-        self.beta  = 5  #self.v
-        self.gamma = 5 #self.n
+        self.alpha = 0.5/self.k #50/self.k #0.0005/self.k  #self.u
+        self.beta  = 0.1 #5  #self.v
+        self.gamma = 0.1 #5 #self.n
 
         self.O = np.zeros((self.u, self.k))  # Object matrix
         self.A = np.zeros((self.v, self.k))  # Actor matrix
@@ -103,19 +103,19 @@ class TriMine(object):
                 if np.abs(self.train_log[-1] - self.train_log[-2]) < tol:
                     print('Early stopping')
                     break
-        if verbose == True:
-            # Print learning log
-            print('Iteration', iteration + 1)
-            print('loglikelihood=\t', llh)
-            print(f'| alpha\t| {self.alpha:.3f}')
-            print(f'| beta \t| {self.beta:.3f} ')
-            print(f'| gamma\t| {self.gamma:.3f}')
-            # Save learning log
-            plt.plot(self.train_log)
-            plt.xlabel('Iterations')
-            plt.ylabel('Log-likelihood')
-            plt.savefig(self.outputdir + 'train_log.png')
-            plt.close()
+            if verbose == True:
+                # Print learning log
+                print('Iteration', iteration + 1)
+                print('loglikelihood=\t', llh)
+                print(f'| alpha\t| {self.alpha:.3f}')
+                print(f'| beta \t| {self.beta:.3f} ')
+                print(f'| gamma\t| {self.gamma:.3f}')
+                # Save learning log
+                plt.plot(self.train_log)
+                plt.xlabel('Iterations')
+                plt.ylabel('Log-likelihood')
+                plt.savefig(self.outputdir + 'train_log.png')
+                plt.close()
         
 
     def infer_online(self, tensor, n_iter=10, tol=1.e-8,verbose=True):
