@@ -9,6 +9,7 @@ import numba
 import copy
 from hmmlearn.hmm import GaussianHMM
 import time
+import statistics
 
 #for omiting warnings
 # from numba import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
@@ -52,6 +53,14 @@ class Regime(object):
         cost += FB * 3
         self.costM = cost
         print(cost)
+        return cost
+
+    def compute_costC(self,seq):
+        llh = self.model.score(seq)
+        cost = -llh / np.log(2)
+        self.costC = cost
+        print(f'costC:{cost}')
+
         return cost
 
     # def compute_total(self):
@@ -218,7 +227,7 @@ class TriMine(object):
             #         print('Early stopping')
             #         break
         
-        self.model = self.estimate_hmm(self.C)
+        self.model = self.estimate_hmm(ZnormSequence(self.C))
         self.prev_cnt = cnt 
         self.Save_prev_status() 
         self.init_regime(tensor,0)
@@ -516,15 +525,18 @@ class TriMine(object):
     def model_compressinon(self,pre_n,new_cnt):
         shift_flag = False
 
+        cur_C = ZnormSequence(self.C)[pre_n:,:]
+
         prev_rgm = self.regimes[self.prev_rgm_id]
         candidate_rgm = Regime()
-        candidate_rgm.model = self.estimate_hmm(self.C[pre_n:,:])
+        candidate_rgm.model = self.estimate_hmm(cur_C)
         candidate_rgm.k = self.k
         candidate_rgm.alpha = self.alpha;candidate_rgm.beta = self.beta;candidate_rgm.gamma = self.gamma
 
         ## compute_costM 
         costM = candidate_rgm.compute_costM()
-        cost_1 =  -self.llh + costM
+        costC = candidate_rgm.compute_costC(cur_C)
+        cost_1 =  costC + costM
         print(f'new_regime:::{cost_1}')
         
         #直近とコスト比較
@@ -534,7 +546,8 @@ class TriMine(object):
         #     print(cand)
         #     print(min_)
         #     min_ = cand if cand < min_ else min_
-        min_ = - self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma,new_cnt-self.prev_cnt)
+        min_ = prev_rgm.compute_costC(cur_C)
+        # min_ = - self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma,new_cnt-self.prev_cnt)
         cost_0 = min_
 
         print(f'prev_regime:::{cost_0}')
@@ -772,3 +785,16 @@ def log_s(x):
 
 def costHMM(k, d):
     return FB * (k + k ** 2 + 2 * k * d) + 2. * np.log(k) / np.log(2.) + 1.
+
+
+def ZnormSequence(seq,MAXVAL=1):
+    #expect shape(length,dim)
+    n_dims=seq.shape[1]
+    normSeq = np.zeros(seq.shape)
+
+    for i,seq_d in enumerate(seq.T):
+        std = statistics.pstdev(seq_d)
+        mean = statistics.mean(seq_d)
+
+        normSeq[:,i]=[MAXVAL*(a-mean)/std for a in seq_d] 
+    return normSeq
