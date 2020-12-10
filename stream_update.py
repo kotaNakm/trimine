@@ -85,15 +85,11 @@ if __name__ == '__main__':
     trimine.save_model()
     factors_plot(trimine)
 
-
-    #strem
+    #stream
     width=20
     start_time_stream = time.process_time()
-    prev_n = train_n
-    tensor_S = tensor[:,:,prev_n:prev_n+width]
     path = []
     for i in range(train_n,n,width):
-        cur_n = i+width
         outputdir_s=outputdir+str(i)+'/'
         trimine.outputdir = outputdir_s
         if os.path.exists(outputdir_s):
@@ -101,7 +97,7 @@ if __name__ == '__main__':
         os.makedirs(outputdir_s)
         
         start_time = time.process_time()
-        shift_flag = trimine.infer_online_HMM(tensor[:,:,prev_n:cur_n], prev_n, cur_n, n_iter=10,verbose=True)#20 #50
+        shift_flag = trimine.infer_online_HMM(tensor[:,:,i:i+width],n_iter=10,verbose=True)#20 #50
         elapsed_time = time.process_time() - start_time
         print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
         trimine.save_model()
