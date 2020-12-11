@@ -10,8 +10,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from trimine_HMM import TriMine
 import math
+import dill
 
-TR=0.2
+
 
 def factors_plot(trimine):    
     O, A, C = trimine.get_factors()
@@ -42,14 +43,14 @@ def factors_plot(trimine):
     plt.savefig(outputdir + 'C.png')
     plt.close()
 
-
 if __name__ == '__main__':
 
     # input_tag = 'us_ele' #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
-    input_tag = 'HVFTV_h_1' #
-    # input_tag = 'HVFTV_m_1'
+    # input_tag = 'HVFTV_h_1';TR=0.5;width=20
+    input_tag = 'HVFTV_h_1';TR=0.1;width=10
+    # input_tag = 'HVFTV_m_1';TR=0.3;width=200
 
     tensor = np.load(f'../{input_tag}.npy')
     outputdir = '../trimine_result_stream_update/' + input_tag +'/'
@@ -86,9 +87,10 @@ if __name__ == '__main__':
     factors_plot(trimine)
 
     #stream
-    width=20
     start_time_stream = time.process_time()
     path = []
+    path.append([0,0])
+    times = []
     for i in range(train_n,n,width):
         outputdir_s=outputdir+str(i)+'/'
         trimine.outputdir = outputdir_s
@@ -97,15 +99,18 @@ if __name__ == '__main__':
         os.makedirs(outputdir_s)
         
         start_time = time.process_time()
-        shift_flag = trimine.infer_online_HMM(tensor[:,:,i:i+width],n_iter=10,verbose=True)#20 #50
+        shift_id = trimine.infer_online_HMM(tensor[:,:,i:i+width],n_iter=10,verbose=False)#20 #50
         elapsed_time = time.process_time() - start_time
         print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
+        times.append(elapsed_time)
         trimine.save_model()
         factors_plot(trimine)
-        if shift_flag:
+        if shift_id:
             prev_n = i
-            path.append([shift_flag,prev_n])
+            path.append([shift_id,prev_n])
 
     elapsed_time = time.process_time() - start_time_stream
     print(f'Elapsed time(all stream processing): {elapsed_time:.2f} [sec]')
-    
+    result = [path,times,trimine]
+    if True:
+        dill.dump(result, open(f'{outputdir}result.dill','wb'))

@@ -17,7 +17,7 @@ import warnings
 warnings.simplefilter('ignore')
 
 MINK = 1
-MAXK = 8
+MAXK = 5
 N_INFER_ITER_HMM = 5
 ZERO = 1.e-8
 FB = 4 * 8
@@ -55,12 +55,11 @@ class Regime(object):
         print(cost)
         return cost
 
-    def compute_costC(self,seq):
-        llh = self.model.score(seq)
+    def compute_costC(self,seq,pre_n,n):
+        llh = self.model.score(seq)/(n - pre_n)
         cost = -llh / np.log(2)
         self.costC = cost
         print(f'costC:{cost}')
-
         return cost
 
     # def compute_total(self):
@@ -305,9 +304,9 @@ class TriMine(object):
                 plt.savefig(self.outputdir + 'train_log.png')
                 plt.close()
         
-        shift_flag = self.model_compressinon(pre_n,new_cnt)
+        shift_id = self.model_compressinon(pre_n,new_cnt)
         self.prev_cnt = new_cnt
-        return shift_flag
+        return shift_id
 
     def loglikelihood(self,pre_n,alpha,beta,gamma,cnt):
         """ Compute Log-likelihood """
@@ -360,8 +359,8 @@ class TriMine(object):
         # llh -= loggamma(cnt)
         # print(loggamma(cnt))
 
-        print(f'div{np.log(cnt * 1/alpha * 1/beta *1/gamma)}')
-        print(f'llh:{llh}')
+        # print(f'div{np.log(cnt * 1/alpha * 1/beta *1/gamma)}')
+        # print(f'llh:{llh}')
 
         return llh/np.log(cnt)#* 1/alpha * 1/beta *1/gamma)
 
@@ -478,12 +477,13 @@ class TriMine(object):
                 for j in range(pre_n,self.n):
                     self.C[j, i] = (
                         (self.Nkn[i, j] + self.gamma)
-                        / (self.Nk[i] - self.prev_Nk[i] + n * self.gamma)) * (self.Nk[i] - self.prev_Nk[i]) / self.prev_Nk[i]  #* self.Nkn[i,j]/self.Nkn[i,:].sum())
+                        / (self.Nk[i] - self.prev_Nk[i] + n * self.gamma)) * (self.Nk[i] - self.prev_Nk[i]) / self.norm_Nk[i]  #* self.Nkn[i,j]/self.Nkn[i,:].sum())
             else:     
                 for j in range(pre_n,self.n):
                     self.C[j, i] = (
                         (self.Nkn[i, j] + self.gamma)
                         / (self.Nk[i] + self.n * self.gamma))#* self.Nkn[i,j]/self.Nkn[i,:].sum())
+                self.norm_Nk = self.Nk
         
         
         # for j in range(pre_n,cur_n):
@@ -523,7 +523,7 @@ class TriMine(object):
         # print(self.model.covars_)
 
     def model_compressinon(self,pre_n,new_cnt):
-        shift_flag = False
+        shift_id = False
 
         cur_C = ZnormSequence(self.C)[pre_n:,:]
 
@@ -532,23 +532,19 @@ class TriMine(object):
         candidate_rgm.model = self.estimate_hmm(cur_C)
         candidate_rgm.k = self.k
         candidate_rgm.alpha = self.alpha;candidate_rgm.beta = self.beta;candidate_rgm.gamma = self.gamma
+        candidate_rgm.O = self.O;candidate_rgm.A = self.A
 
         ## compute_costM 
         costM = candidate_rgm.compute_costM()
-        costC = candidate_rgm.compute_costC(cur_C)
-        cost_1 =  costC + costM
+        costC = candidate_rgm.compute_costC(cur_C,pre_n,self.n)
+        cost_1 = costC + costM 
+        # cost_1 =  costC / (self.n - pre_n) + costM / new_cnt - self.prev_cnt
+
         print(f'new_regime:::{cost_1}')
         
         #直近とコスト比較
-        # min_ = np.inf
-        # for mean in prev_rgm.model.means_:
-        #     cand = - self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma,new_cnt-self.prev_cnt)
-        #     print(cand)
-        #     print(min_)
-        #     min_ = cand if cand < min_ else min_
-        min_ = prev_rgm.compute_costC(cur_C)
         # min_ = - self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma,new_cnt-self.prev_cnt)
-        cost_0 = min_
+        cost_0 = prev_rgm.compute_costC(cur_C,pre_n,self.n)
 
         print(f'prev_regime:::{cost_0}')
 
@@ -559,38 +555,39 @@ class TriMine(object):
         print('=========================================')
         print(f'diff::{cost_1-cost_0}')
 
-        if cost_0 < cost_1:
-            pass
-            print()
+        if cost_0 < cost_1: #stay
+            print('stay')
 
-        else:
-            print(f'shift::{pre_n + self.n}')
-            # self.Save_prev_status() 
-            exit()
-            # pass
-            # exit()
+        else: #shift to any regime
+            shift_id = len(self.regimes) #index + 1
+            min_ = cost_1
+            add_flag = True
 
-            # self.prev_cnt = new_cnt
-            # self.prev_Nsum = self.Nsum
-            # self.init_regime(tensor,0)
-            # self.regimes[0].costC = llh 
+            #regime comparison
+            for rgm_id,rgm  in enumerate(self.regimes):
+                if rgm_id == self.prev_rgm_id:
+                    continue
+                else:
+                    cost_0 = rgm.compute_costC(cur_C,pre_n,self.n)
+                    if cost_0 < min_:
+                        shift_id = rgm_id
+                        add_flag = False
+            
+            print(f'shift::{self.n}')
+            print(f'{self.prev_rgm_id}===>>>{shift_id}')
 
-            # exit()
-        #shiftしたら過去全部と比較
-        # min_ = np.inf
-        # min_id = -1
-        # for rgm_id ,rgm in self.regimes:
-        #     cost = rgm.compute_costC(O,A,C,pre_n,self.n)
-        #     print(f'regime_{rgm_id}:::{cost}')
-        #     if min_>cost:
-        #         min_id = rgm_id
-        #         min_ = cost
+            if add_flag: #add candidate  regime
+                self.regimes.append(candidate_rgm)
+                self.prev_rgm_id = shift_id
+                
+            else: # use existed regime
+                shift_rgm = self.regimes[shift_id]
+                self.alpha  = shift_rgm.alpha
+                self.beta = shift_rgm.beta
+                self.gamma = shift_rgm.gamma
+                self.prev_rgm_id = shift_id
 
-        # print(f'min_cost:::{min_}')
-        # if min_ > cur_cost:
-        #     shift_flag
-        
-        return shift_flag #shift先のregime番号
+        return shift_id #shift先のregime番号
 
 
 
@@ -676,7 +673,6 @@ def _sample_topic(Nk,Nu,Nku,Nkv,Nkn,k,u,v,n,alpha,beta,gamma,X,Z,pre_n,prev_cnt)
 
 @numba.jit #(nopython=True)
 def _sampleZ_pickC(Nk,Nu,Nku,Nkv,Nkn,prev_Nk,k,u,v,n,alpha,beta,gamma,X,model,Z,pre_n,prev_cnt):
-
 
     # C_sample = model.sample(n-pre_n)[0]
     # C_sample = np.where(C_sample<ZERO,ZERO,C_sample)

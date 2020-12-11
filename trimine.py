@@ -23,7 +23,7 @@ class TriMine(object):
         self.n = n  # data duration
         self.outputdir = outputdir
         self.train_log = []
-        self.max_alpha = 1#100 #0.001
+        self.max_alpha = 100#100 #0.001 #1
         self.max_beta  = 1#10
         self.max_gamma = 1#10
         self.init_params()
@@ -34,7 +34,9 @@ class TriMine(object):
 
         # if parameter > 1: pure
         # if parameter < 1: mixed
-        self.alpha = 0.5/self.k #50/self.k #0.0005/self.k  #self.u
+
+        #initial parameter folllowing T. L. Griffiths and M. Steyvers. Finding scientific topics. Proceedings of the National Academy of Sciences, Vol. 101, No. Suppl. 1, pp. 5228–5235, April 2004.
+        self.alpha = 50/self.k #0.5/self.k #0.0005/self.k  #self.u
         self.beta  = 0.1 #5  #self.v
         self.gamma = 0.1 #5 #self.n
 
