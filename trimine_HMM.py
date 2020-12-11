@@ -88,7 +88,7 @@ class TriMine(object):
         self.n = n  # data duration
         self.outputdir = outputdir
         self.train_log = []
-        self.max_alpha = 1 #0.001
+        self.max_alpha = 100 #0.001
         self.max_beta  = 1
         self.max_gamma = 1
         self.init_params()
@@ -101,7 +101,7 @@ class TriMine(object):
         """ Initialize model parameters """
         # if parameter > 1: pure
         # if parameter < 1: mixed
-        self.alpha = 0.5/self.k #0.0005/self.k #  #self.u
+        self.alpha = 50/self.k #0.0005/self.k #  #self.u
         self.beta  = 0.1#5  #self.v
         self.gamma = 0.1#5 #self.n
         self.O = np.zeros((self.u, self.k))  # Object matrix
@@ -129,15 +129,15 @@ class TriMine(object):
         self.prev_Nsum = copy.deepcopy(self.Nsum)
         self.prev_Z = copy.deepcopy(self.Z)
 
-    def Undo_prev_status(self):
-        self.Nk = copy.deepcopy(self.prev_Nk)
-        self.Nu = copy.deepcopy(self.prev_Nu)
-        self.Nku = copy.deepcopy(self.prev_Nku)
-        self.Nkv = copy.deepcopy(self.prev_Nkv)
-        self.Nkn = copy.deepcopy(self.prev_Nkn)
-        self.Nsum =copy.deepcopy( self.prev_Nsum)
-        self.Z = copy.deepcopy(self.prev_Z)
-        print('undo prev rgm')
+    # def Undo_prev_status(self):
+    #     self.Nk = copy.deepcopy(self.prev_Nk)
+    #     self.Nu = copy.deepcopy(self.prev_Nu)
+    #     self.Nku = copy.deepcopy(self.prev_Nku)
+    #     self.Nkv = copy.deepcopy(self.prev_Nkv)
+    #     self.Nkn = copy.deepcopy(self.prev_Nkn)
+    #     self.Nsum =copy.deepcopy( self.prev_Nsum)
+    #     self.Z = copy.deepcopy(self.prev_Z)
+    #     print('undo prev rgm')
 
     def update_status(self,tensor,prev_n):
         # self.Undo_prev_status()
@@ -226,12 +226,12 @@ class TriMine(object):
             #         print('Early stopping')
             #         break
         
-        self.model = self.estimate_hmm(ZnormSequence(self.C))
-        self.prev_cnt = cnt 
-        self.Save_prev_status() 
-        self.init_regime(tensor,0)
-        self.regimes[0].costC = llh 
-
+        # self.model = self.estimate_hmm(ZnormSequence(self.C))
+        # self.prev_cnt = cnt 
+        # self.Save_prev_status() 
+        # self.init_regime(tensor,0)
+        # self.regimes[0].costC = llh 
+        # self.init_regime(tensor,0)
         self.vscost_log=[]
 
         if verbose == True:
@@ -484,7 +484,8 @@ class TriMine(object):
                         (self.Nkn[i, j] + self.gamma)
                         / (self.Nk[i] + self.n * self.gamma))#* self.Nkn[i,j]/self.Nkn[i,:].sum())
                 self.norm_Nk = self.Nk
-        
+        print(self.Nkn[:,pre_n:].sum())
+        print(self.Nk.sum()-self.prev_Nk.sum())
         
         # for j in range(pre_n,cur_n):
         #     sum_c = self.C[j,:].sum()
@@ -526,7 +527,8 @@ class TriMine(object):
         shift_id = False
 
         cur_C = ZnormSequence(self.C)[pre_n:,:]
-
+        print(self.C[pre_n:,:])
+        print(cur_C)
         prev_rgm = self.regimes[self.prev_rgm_id]
         candidate_rgm = Regime()
         candidate_rgm.model = self.estimate_hmm(cur_C)

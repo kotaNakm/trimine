@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
     # input_tag = 'HVFTV_h_1';TR=0.5;width=20
-    input_tag = 'HVFTV_h_1';TR=0.1;width=10
+    input_tag = 'HVFTV_h_1';TR=0.1;width=200
     # input_tag = 'HVFTV_m_1';TR=0.3;width=200
 
     tensor = np.load(f'../{input_tag}.npy')
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     start_time = time.process_time()
     tensor_T = tensor[:,:,:train_n]
     trimine.init_infer(tensor_T, n_iter=10)#10 #20 #50
-    trimine.init_regime(tensor_T,0)
+    # trimine.init_regime(tensor_T,0)
 
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time(train): {elapsed_time:.2f} [sec]')
@@ -87,10 +87,44 @@ if __name__ == '__main__':
     factors_plot(trimine)
 
     #stream
+    # start_time_stream = time.process_time()
+    # path = []
+    # path.append([0,0])
+    # times = []
+    # for i in range(train_n,n,width):
+    #     outputdir_s=outputdir+str(i)+'/'
+    #     trimine.outputdir = outputdir_s
+    #     if os.path.exists(outputdir_s):
+    #         shutil.rmtree(outputdir_s)
+    #     os.makedirs(outputdir_s)
+        
+    #     start_time = time.process_time()
+    #     shift_id = trimine.infer_online_HMM(tensor[:,:,i:i+width],n_iter=10,verbose=False)#20 #50
+    #     elapsed_time = time.process_time() - start_time
+    #     print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
+    #     times.append(elapsed_time)
+    #     trimine.save_model()
+    #     factors_plot(trimine)
+    #     if shift_id:
+    #         prev_n = i
+    #         path.append([shift_id,prev_n])
+
+    # elapsed_time = time.process_time() - start_time_stream
+    # print(f'Elapsed time(all stream processing): {elapsed_time:.2f} [sec]')
+    # result = [path,times,trimine]
+    # if True:
+    #     dill.dump(result, open(f'{outputdir}result.dill','wb'))
+
+
+    #毎回trimine
     start_time_stream = time.process_time()
     path = []
     path.append([0,0])
     times = []
+    factors = []
+    params = []
+    all_C = np.zeros((n,k))
+    all_C[:train_n,:] = trimine.get_factors()[2] 
     for i in range(train_n,n,width):
         outputdir_s=outputdir+str(i)+'/'
         trimine.outputdir = outputdir_s
@@ -99,18 +133,16 @@ if __name__ == '__main__':
         os.makedirs(outputdir_s)
         
         start_time = time.process_time()
-        shift_id = trimine.infer_online_HMM(tensor[:,:,i:i+width],n_iter=10,verbose=False)#20 #50
+        trimine = TriMine(k, u, v, width, outputdir)
+        shift_id = trimine.init_infer(tensor[:,:,i:i+width],n_iter=10,verbose=True)#20 #50
         elapsed_time = time.process_time() - start_time
         print(f'Elapsed time(online#{i}): {elapsed_time:.2f} [sec]')
         times.append(elapsed_time)
-        trimine.save_model()
+        all_C[i:i+width,:] = trimine.get_factors()[2]
+        factors.append(trimine.get_factors())
+        params.append(trimine.get_params())
+        trimine.C = all_C
         factors_plot(trimine)
         if shift_id:
             prev_n = i
             path.append([shift_id,prev_n])
-
-    elapsed_time = time.process_time() - start_time_stream
-    print(f'Elapsed time(all stream processing): {elapsed_time:.2f} [sec]')
-    result = [path,times,trimine]
-    if True:
-        dill.dump(result, open(f'{outputdir}result.dill','wb'))
