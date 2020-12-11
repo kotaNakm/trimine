@@ -542,6 +542,7 @@ class TriMine(object):
         cost_1 = costC + costM 
         # cost_1 =  costC / (self.n - pre_n) + costM / new_cnt - self.prev_cnt
 
+
         print(f'new_regime:::{cost_1}')
         
         #直近とコスト比較
