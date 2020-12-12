@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
     # input_tag = 'HVFTV_h_1';TR=0.5;width=20
-    input_tag = 'HVFTV_h_1';TR=0.1;width=10
+    input_tag = 'HVFTV_h_1';TR=0.1;width=15
     # input_tag = 'HVFTV_m_1';TR=0.3;width=200
 
     tensor = np.load(f'../{input_tag}.npy')

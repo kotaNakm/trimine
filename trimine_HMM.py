@@ -306,6 +306,14 @@ class TriMine(object):
         
         shift_id = self.model_compressinon(pre_n,new_cnt)
         self.prev_cnt = new_cnt
+
+        print(self.Nk.sum())
+        print(self.Nkn.sum())
+        print(self.Nku.sum())
+        print(self.Nk[1].sum())
+        print(self.Nkn[1,:].sum())
+        print(self.Nku[1,:].sum())
+         
         return shift_id
 
     def loglikelihood(self,pre_n,alpha,beta,gamma,cnt):
@@ -477,13 +485,13 @@ class TriMine(object):
                 for j in range(pre_n,self.n):
                     self.C[j, i] = (
                         (self.Nkn[i, j] + self.gamma)
-                        / (self.Nk[i] - self.prev_Nk[i] + n * self.gamma)) * (self.Nk[i] - self.prev_Nk[i]) / self.norm_Nk[i]  #* self.Nkn[i,j]/self.Nkn[i,:].sum())
+                        / (self.Nk[i] - self.prev_Nk[i] + n * self.gamma)) * (self.Nk.sum() - self.prev_Nk.sum()) / self.norm_Nk  #* self.Nkn[i,j]/self.Nkn[i,:].sum())
             else:     
                 for j in range(pre_n,self.n):
                     self.C[j, i] = (
                         (self.Nkn[i, j] + self.gamma)
                         / (self.Nk[i] + self.n * self.gamma))#* self.Nkn[i,j]/self.Nkn[i,:].sum())
-                self.norm_Nk = self.Nk
+                self.norm_Nk = self.Nk.sum()
         
         
         # for j in range(pre_n,cur_n):
