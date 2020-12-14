@@ -615,8 +615,7 @@ class TriMine(object):
 
         return shift_id #shift先のregime番号
 
-    def rgm_update_fin():
-        
+    def rgm_update_fin(self):
         if self.prev_rgm_id == (len(self.regimes)-1):
             rgm = self.regimes[self.prev_rgm_id]
             rgm.alpha  = copy.deepcopy(self.alpha)
