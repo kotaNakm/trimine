@@ -21,6 +21,7 @@ MAXK = 5
 N_INFER_ITER_HMM = 5
 ZERO = 1.e-8
 FB = 4 * 8
+TB = 1 #0.1 1 #10  # 100 #1000 #transiton bias
 
 # https://github.com/scikit-learn/scikit-learn/blob/7e85a6d1f/sklearn/decomposition/_online_lda.py#L135
 
@@ -56,9 +57,12 @@ class Regime(object):
         return cost
 
     def compute_costC(self,seq,pre_n,n):
-        llh = self.model.score(seq)/(n - pre_n)
-        cost = -llh / np.log(2)
-        self.costC = cost
+        #Gaussian HMM returns log prob
+        
+        # llh = self.model.score(seq)#/(n - pre_n)
+        # cost = -llh / np.log(2)
+        # self.costC = cost*(n - pre_n)
+        cost = - self.model.score(seq) * TB
         print(f'costC:{cost}')
         return cost
 
@@ -88,7 +92,7 @@ class TriMine(object):
         self.n = n  # data duration
         self.outputdir = outputdir
         self.train_log = []
-        self.max_alpha = 1 #0.001
+        self.max_alpha = 100 #0.001
         self.max_beta  = 1
         self.max_gamma = 1
         self.init_params()
@@ -101,7 +105,7 @@ class TriMine(object):
         """ Initialize model parameters """
         # if parameter > 1: pure
         # if parameter < 1: mixed
-        self.alpha = 0.5/self.k #0.0005/self.k #  #self.u
+        self.alpha = 50/self.k #0.0005/self.k #  #self.u
         self.beta  = 0.1#5  #self.v
         self.gamma = 0.1#5 #self.n
         self.O = np.zeros((self.u, self.k))  # Object matrix
@@ -543,9 +547,9 @@ class TriMine(object):
         candidate_rgm.O = self.O;candidate_rgm.A = self.A
 
         ## compute_costM 
-        costM = candidate_rgm.compute_costM()
+        costM = candidate_rgm.compute_costM()#/(self.n - pre_n)
         costC = candidate_rgm.compute_costC(cur_C,pre_n,self.n)
-        cost_1 = costC + costM 
+        cost_1 = costC + costM
         # cost_1 =  costC / (self.n - pre_n) + costM / new_cnt - self.prev_cnt
 
         print(f'new_regime:::{cost_1}')
@@ -553,7 +557,6 @@ class TriMine(object):
         #直近とコスト比較
         # min_ = - self.loglikelihood(pre_n,prev_rgm.alpha,prev_rgm.beta,prev_rgm.gamma,new_cnt-self.prev_cnt)
         cost_0 = prev_rgm.compute_costC(cur_C,pre_n,self.n)
-
         print(f'prev_regime:::{cost_0}')
 
         self.vscost_log.append([cost_0,cost_1,cost_1-cost_0])
@@ -580,8 +583,9 @@ class TriMine(object):
                     if cost_0 < min_:
                         shift_id = rgm_id
                         add_flag = False
-            
-            print(f'shift::{self.n}')
+                        min_ = cost_0
+
+            print(f'shift::{pre_n}')
             print(f'{self.prev_rgm_id}===>>>{shift_id}')
 
             if add_flag: #add candidate  regime
