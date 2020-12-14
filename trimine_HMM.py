@@ -21,7 +21,7 @@ MAXK = 5
 N_INFER_ITER_HMM = 5
 ZERO = 1.e-8
 FB = 4 * 8
-TB = 1 #0.1 1 #10  # 100 #1000 #transiton bias
+TB = 10 #0.1 1 #10  # 100 #1000 #transiton bias
 
 # https://github.com/scikit-learn/scikit-learn/blob/7e85a6d1f/sklearn/decomposition/_online_lda.py#L135
 
@@ -273,7 +273,14 @@ class TriMine(object):
     
         self.update_status(tensor,pre_n)
         self.train_log = []
-            
+
+        # print(self.Nk)
+        # print(self.Nu)
+        # print(self.Nku)
+        # print(self.Nkv)
+        # print(self.Nkn)
+        # print(self.O)
+
         for iteration in range(n_iter):
             # Sampling hidden topics z, i.e., Equation (1)
             self.Z, new_cnt = self.sampleZ_pickC(tensor, self.model, self.Z, pre_n, cnt)
@@ -310,13 +317,19 @@ class TriMine(object):
         
         shift_id = self.model_compressinon(pre_n,new_cnt)
         self.prev_cnt = new_cnt
-
-        print(self.Nk.sum())
-        print(self.Nkn.sum())
-        print(self.Nku.sum())
-        print(self.Nk[1].sum())
-        print(self.Nkn[1,:].sum())
-        print(self.Nku[1,:].sum())
+        
+        # print(self.O)
+        # print(self.Nk)
+        # print(self.Nu)
+        # print(self.Nku)
+        # print(self.Nkv)
+        # print(self.Nkn)
+        # print(self.Nk.sum())
+        # print(self.Nkn.sum())
+        # print(self.Nku.sum())
+        # print(self.Nk[1].sum())
+        # print(self.Nkn[1,:].sum())
+        # print(self.Nku[1,:].sum())
          
         return shift_id
 
@@ -543,8 +556,8 @@ class TriMine(object):
         candidate_rgm = Regime()
         candidate_rgm.model = self.estimate_hmm(cur_C)
         candidate_rgm.k = self.k
-        candidate_rgm.alpha = self.alpha;candidate_rgm.beta = self.beta;candidate_rgm.gamma = self.gamma
-        candidate_rgm.O = self.O;candidate_rgm.A = self.A
+        candidate_rgm.alpha = copy.deepcopy(self.alpha);candidate_rgm.beta = copy.deepcopy(self.beta);candidate_rgm.gamma = copy.deepcopy(self.gamma)
+        candidate_rgm.O = copy.deepcopy(self.O);candidate_rgm.A = copy.deepcopy(self.A)
 
         ## compute_costM 
         costM = candidate_rgm.compute_costM()#/(self.n - pre_n)
@@ -589,19 +602,28 @@ class TriMine(object):
             print(f'{self.prev_rgm_id}===>>>{shift_id}')
 
             if add_flag: #add candidate  regime
+                
                 self.regimes.append(candidate_rgm)
                 self.prev_rgm_id = shift_id
                 
             else: # use existed regime
                 shift_rgm = self.regimes[shift_id]
-                self.alpha  = shift_rgm.alpha
-                self.beta = shift_rgm.beta
-                self.gamma = shift_rgm.gamma
+                self.alpha  = copy.deepcopy(shift_rgm.alpha)
+                self.beta =copy.deepcopy(shift_rgm.beta)
+                self.gamma = copy.deepcopy(shift_rgm.gamma)
                 self.prev_rgm_id = shift_id
 
         return shift_id #shift先のregime番号
 
-
+    def rgm_update_fin():
+        
+        if self.prev_rgm_id == (len(self.regimes)-1):
+            rgm = self.regimes[self.prev_rgm_id]
+            rgm.alpha  = copy.deepcopy(self.alpha)
+            rgm.beta = copy.deepcopy(self.beta)
+            rgm.gamma = copy.deepcopy(self.gamma)
+            rgm.O = copy.deepcopy(self.O)
+            rgm.C = copy.deepcopy(self.C)
 
     def save_model(self):
         """ Save all of parameters for TriMine

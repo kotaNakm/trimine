@@ -18,22 +18,22 @@ def factors_plot(trimine):
     O, A, C = trimine.get_factors()
     outputdir = trimine.outputdir
 
-    sns.set()
-    plt.figure(figsize=(15,4))
-    plt.plot(O)
-    plt.title('Object matrix, O')
-    plt.xlabel('Objects')
-    plt.ylabel('Topic')
-    plt.savefig(outputdir + 'O.png')
-    plt.close()
+    # sns.set()
+    # plt.figure(figsize=(15,4))
+    # plt.plot(O)
+    # plt.title('Object matrix, O')
+    # plt.xlabel('Objects')
+    # plt.ylabel('Topic')
+    # plt.savefig(outputdir + 'O.png')
+    # plt.close()
 
-    plt.figure(figsize=(15,4))
-    plt.plot(A)
-    plt.title('Actor matrix, A')
-    plt.xlabel('Actors')
-    plt.ylabel('Topic')
-    plt.savefig(outputdir + 'A.png')
-    plt.close()
+    # plt.figure(figsize=(15,4))
+    # plt.plot(A)
+    # plt.title('Actor matrix, A')
+    # plt.xlabel('Actors')
+    # plt.ylabel('Topic')
+    # plt.savefig(outputdir + 'A.png')
+    # plt.close()
 
     plt.figure(figsize=(15,4))
     plt.plot(C)
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         if type(shift_id) == int:
             prev_n = i
             path.append([shift_id,prev_n])
-
+    trimine.rgm_update_fin()
     elapsed_time = time.process_time() - start_time_stream
     print(f'Elapsed time(all stream processing): {elapsed_time:.2f} [sec]')
     result = [path,times,trimine]
