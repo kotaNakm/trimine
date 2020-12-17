@@ -45,20 +45,20 @@ def factors_plot(trimine):
 
 if __name__ == '__main__':
 
-    input_tag = 'us_ele';TR=0.3;width=20 #
+    # input_tag = 'us_ele';TR=0.3;width=20 #
     # input_tag = 'online_retail_a1' #(4631, 36, 17713)
     # input_tag = 'online_retail_a2' #(36, 4631, 17713)
     # input_tag = 'HVFTV_h_1';TR=0.5;width=20
     # input_tag = 'HVFTV_h_1';TR=0.2;width=20
     # input_tag = 'HVFTV_m_1';TR=0.3;width=200
     # input_tag = 'HVFTV_m_1_pudo';TR=0.3;width=200
-    input_tag = 'HVFTV_h_1_pudo';TR=0.2;width=20
+    input_tag = 'HVFTV_h_1_pudo';TR=0.1;width=20
     # input_tag = 'HVFTV_m_2_pudo';TR=0.1;width=30
     # input_tag = 'HVFTV_h_2_pudo';TR=0.1;width=12
 
 
     tensor = np.load(f'../{input_tag}.npy')
-    outputdir = '../trimine_result_stream_update/' + input_tag +'/'
+    outputdir = '../trimine_result_stream_update2/' + input_tag +'/'
     
     if os.path.exists(outputdir):
         shutil.rmtree(outputdir)
@@ -84,7 +84,6 @@ if __name__ == '__main__':
     start_time = time.process_time()
     tensor_T = tensor[:,:,:train_n]
     trimine.init_infer(tensor_T, n_iter=10)#10 #20 #50
-    trimine.init_regime(tensor_T,0)
 
     elapsed_time = time.process_time() - start_time
     print(f'Elapsed time(train): {elapsed_time:.2f} [sec]')
